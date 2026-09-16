@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "id": "spotify",
+  "name": "Spotify Mini Player",
+  "version": "1.0.0",
+  "author": "<your-name>",
+  "description": "Now-playing bar widget with playback controls for any Spotify Connect device, via the Spotify Web API",
+  "kinds": [
+    "bar-widget"
+  ],
+  "entryPoints": {
+    "barWidget": "BarWidget.qml"
+  },
+  "barWidget": {
+    "displayName": "Spotify Mini Player",
+    "description": "Shows and controls playback on your Spotify account (works with any Spotify Connect device)",
+    "category": "Media",
+    "allowMultiple": false,
+    "defaultSection": "center"
+  }
+}
