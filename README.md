@@ -44,7 +44,7 @@ omarchy plugin add https://github.com/nichovski/omarchy-spotify.git --enable
 After installing, run the setup script once:
 
 ```bash
-python3 ~/.config/omarchy/plugins/spotify/setup.py
+python3 ~/.config/omarchy/plugins/nichovski.spotify/setup.py
 ```
 
 It will guide you through:
@@ -76,7 +76,7 @@ in the bar.
 ## Uninstall
 
 ```bash
-omarchy plugin remove spotify
+omarchy plugin remove nichovski.spotify
 rm -rf ~/.config/omarchy/spotify   # optional: removes stored credentials
 ```
 

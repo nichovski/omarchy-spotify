@@ -3,7 +3,7 @@
 Spotify OAuth2 setup helper for the Omarchy Spotify Mini Player plugin.
 
 Usage:
-    python3 ~/.config/omarchy/plugins/spotify/setup.py
+    python3 ~/.config/omarchy/plugins/nichovski.spotify/setup.py
 """
 
 import base64
@@ -259,7 +259,7 @@ def main():
     print("  The widget is already in your bar layout.")
     print("  It will appear once Spotify starts playing something.")
     print()
-    print("  To reconfigure, run: python3 ~/.config/omarchy/plugins/spotify/setup.py")
+    print("  To reconfigure, run: python3 ~/.config/omarchy/plugins/nichovski.spotify/setup.py")
     print()
 
 

@@ -14,13 +14,13 @@ write_error() {
 
 # Load credentials
 if [[ ! -f "$CRED_FILE" ]]; then
-  write_error "No credentials found. Run: python3 ~/.config/omarchy/plugins/spotify/setup.py"
+  write_error "No credentials found. Run: python3 ~/.config/omarchy/plugins/nichovski.spotify/setup.py"
 fi
 
 source "$CRED_FILE"
 
 if [[ -z "${SPOTIFY_CLIENT_ID:-}" || -z "${SPOTIFY_CLIENT_SECRET:-}" || -z "${SPOTIFY_REFRESH_TOKEN:-}" ]]; then
-  write_error "Incomplete credentials. Run: python3 ~/.config/omarchy/plugins/spotify/setup.py"
+  write_error "Incomplete credentials. Run: python3 ~/.config/omarchy/plugins/nichovski.spotify/setup.py"
 fi
 
 # Refresh access token
@@ -33,7 +33,7 @@ TOKEN_RESPONSE=$(curl -s -X POST "https://accounts.spotify.com/api/token" \
 ACCESS_TOKEN=$(echo "$TOKEN_RESPONSE" | jq -r '.access_token // empty' 2>/dev/null || echo "")
 
 if [[ -z "$ACCESS_TOKEN" ]]; then
-  write_error "Failed to refresh token. Credentials may be expired. Run: python3 ~/.config/omarchy/plugins/spotify/setup.py"
+  write_error "Failed to refresh token. Credentials may be expired. Run: python3 ~/.config/omarchy/plugins/nichovski.spotify/setup.py"
 fi
 
 # Fetch currently playing

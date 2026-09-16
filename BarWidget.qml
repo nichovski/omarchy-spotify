@@ -7,13 +7,13 @@ import qs.Commons
 
 BarWidget {
   id: root
-  moduleName: "spotify"
+  moduleName: "nichovski.spotify"
 
   readonly property string configDir: (Quickshell.env("XDG_CONFIG_HOME") || (Quickshell.env("HOME") || "") + "/.config") + "/omarchy"
   readonly property string credentialsFile: configDir + "/spotify/credentials.env"
   readonly property string outputFile: configDir + "/spotify/now_playing.json"
-  readonly property string fetchScript: configDir + "/plugins/spotify/fetch.sh"
-  readonly property string controlScript: configDir + "/plugins/spotify/control.sh"
+  readonly property string fetchScript: configDir + "/plugins/nichovski.spotify/fetch.sh"
+  readonly property string controlScript: configDir + "/plugins/nichovski.spotify/control.sh"
 
   function close() { popupOpen = false }
 
