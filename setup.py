@@ -18,7 +18,7 @@ import urllib.request
 import webbrowser
 from pathlib import Path
 
-DEFAULT_REDIRECT_URI = "http://127.0.0.1:18923/callback"
+DEFAULT_REDIRECT_URI = "https://example.com/callback"
 CREDENTIALS_DIR = Path.home() / ".config" / "omarchy" / "spotify"
 CREDENTIALS_FILE = CREDENTIALS_DIR / "credentials.env"
 SCOPES = "user-read-currently-playing user-read-playback-state user-modify-playback-state"
@@ -159,11 +159,10 @@ def main():
     print("  1. Open: https://developer.spotify.com/dashboard")
     print("  2. Click 'Create App'")
     print("  3. Fill in any app name and description")
-    print("  4. As Redirect URI, try:")
+    print("  4. As Redirect URI, use:")
     print(f"       {DEFAULT_REDIRECT_URI}")
-    print("     (Spotify allows plain HTTP for 127.0.0.1 loopback addresses.)")
-    print("     If the dashboard refuses to save that, use any HTTPS URL")
-    print("     instead, e.g.:  https://example.com/callback")
+    print("     (any HTTPS URL works; the page won't load after authorizing,")
+    print("      you'll just paste the redirect URL back into this script)")
     print("  5. Check the 'Web API' checkbox and click 'Save'")
     print()
 

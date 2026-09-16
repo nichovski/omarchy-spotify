@@ -8,8 +8,6 @@ another computer, a smart speaker, ...), not just the local machine.
 It uses the Spotify Web API, so it works even when nothing is playing
 locally.
 
-![bar](docs/bar.png)
-
 ## Features
 
 - Scrolling "song · artist" label in the bar
@@ -47,10 +45,9 @@ It will guide you through:
 
 1. Creating an app at <https://developer.spotify.com/dashboard>
    (any name/description; check the **Web API** checkbox)
-2. Registering a Redirect URI — the script supports both
-   `http://127.0.0.1:18923/callback` (automatic capture) and any HTTPS URL
-   such as `https://example.com/callback` (manual paste mode)
-3. Authorizing the app with your Spotify account
+2. Registering `https://example.com/callback` as the Redirect URI
+3. Authorizing the app with your Spotify account, then pasting the
+   redirect URL (which contains the auth code) back into the terminal
 
 Credentials are stored locally in
 `~/.config/omarchy/spotify/credentials.env` (chmod 600) and never leave
