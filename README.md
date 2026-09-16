@@ -10,6 +10,8 @@ locally.
 
 ![Spotify Mini Player in the Omarchy bar](docs/bar.png)
 
+![Popup with album art, playback controls and device picker](docs/popup.png)
+
 ## Features
 
 - Scrolling "song · artist" label in the bar
