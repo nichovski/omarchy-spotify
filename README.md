@@ -8,11 +8,15 @@ another computer, a smart speaker, ...), not just the local machine.
 It uses the Spotify Web API, so it works even when nothing is playing
 locally.
 
+![Spotify Mini Player in the Omarchy bar](docs/bar.png)
+
 ## Features
 
 - Scrolling "song · artist" label in the bar
 - Popup with album art, progress bar and ⏮ ⏯ ⏭ controls
 - Controls the active Spotify Connect device, wherever it is
+- Device picker: see which device is playing and switch playback between
+  your devices (phone, computer, speaker, ...)
 - Bar gestures:
   - **Left click** — play / pause
   - **Right click** — open popup

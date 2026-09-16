@@ -27,6 +27,16 @@ BarWidget {
   property int durationMs: 0
   property string lastTimestamp: ""
   property string errorMessage: ""
+  property string deviceName: ""
+  property var devices: []
+
+  readonly property string activeDeviceName: {
+    if (root.deviceName !== "") return root.deviceName
+    for (var i = 0; i < root.devices.length; i++) {
+      if (root.devices[i].is_active) return root.devices[i].name || ""
+    }
+    return ""
+  }
 
   property bool popupOpen: false
   property real maxLabelWidth: 180
@@ -64,6 +74,8 @@ BarWidget {
       root.durationMs = data.duration_ms || 0
       root.lastTimestamp = String(data.timestamp || "")
       root.errorMessage = data.error || ""
+      root.deviceName = data.device || ""
+      root.devices = data.devices || []
     } catch (e) {
       // Ignore parse errors
     }
@@ -109,18 +121,18 @@ BarWidget {
     onRunningChanged: if (!running) pollTimer.restart()
   }
 
-  property string pendingAction: ""
+  property var pendingArgs: []
 
   Process {
     id: controlProcess
-    command: ["bash", root.controlScript, root.pendingAction]
+    command: ["bash", root.controlScript].concat(root.pendingArgs)
     running: false
     onRunningChanged: if (!running) fetchTimer.restart()
   }
 
-  function control(action) {
+  function control(action, arg) {
     if (controlProcess.running) return
-    root.pendingAction = action
+    root.pendingArgs = (arg !== undefined && arg !== null) ? [action, String(arg)] : [action]
     controlProcess.running = true
     // Optimistic UI update while the API call is in flight
     if (action === "playpause") root.isPlaying = !root.isPlaying
@@ -251,6 +263,8 @@ BarWidget {
             fillMode: Image.PreserveAspectCrop
             asynchronous: true
             source: root.artUrl
+            sourceSize.width: 128
+            sourceSize.height: 128
             visible: source !== ""
           }
 
@@ -382,6 +396,95 @@ BarWidget {
           horizontalPadding: Style.spacing.controlPaddingX
           verticalPadding: Style.spacing.controlPaddingY
           onClicked: root.control("next")
+        }
+      }
+
+      // Devices (Spotify Connect)
+      PanelSeparator {
+        visible: root.devices.length > 0
+        foreground: root.bar.foreground
+      }
+
+      Column {
+        id: deviceList
+        visible: root.devices.length > 0
+        width: parent.width
+        spacing: Style.space(4)
+
+        Text {
+          textFormat: Text.PlainText
+          text: root.activeDeviceName !== "" ? "Playing on " + root.activeDeviceName : "Devices"
+          color: Qt.darker(root.bar.foreground, 1.3)
+          font.family: root.bar.fontFamily
+          font.pixelSize: Style.font.caption
+          elide: Text.ElideRight
+          width: parent.width
+        }
+
+        Repeater {
+          model: root.devices
+
+          BorderSurface {
+            id: deviceRow
+            required property var modelData
+
+            readonly property bool isActive: modelData.is_active || modelData.name === root.activeDeviceName
+
+            width: deviceList.width
+            height: deviceInner.implicitHeight + Style.space(8)
+            radius: Style.spacing.labelGap
+            color: isActive ? Style.selectedFillFor(root.bar.foreground, Color.accent) : "transparent"
+            borderSpec: isActive ? Border.controlSpec("normal", root.bar.foreground, Color.accent) : Border.none()
+
+            Row {
+              id: deviceInner
+              anchors.left: parent.left
+              anchors.right: parent.right
+              anchors.verticalCenter: parent.verticalCenter
+              anchors.leftMargin: deviceRow.borderLeft + Style.space(8)
+              anchors.rightMargin: deviceRow.borderRight + Style.space(8)
+              spacing: Style.space(8)
+
+              Text {
+                textFormat: Text.PlainText
+                text: {
+                  var t = (modelData.type || "").toLowerCase()
+                  if (t === "smartphone") return "\u{f10b}"
+                  if (t === "computer") return "\u{f108}"
+                  if (t === "speaker" || t === "castaudio") return "\u{f028}"
+                  if (t === "tv") return "\u{f26c}"
+                  return "\u{f001}"
+                }
+                color: root.bar.foreground
+                font.family: root.bar.fontFamily
+                font.pixelSize: Style.font.body
+                width: Style.space(18)
+                horizontalAlignment: Text.AlignHCenter
+                anchors.verticalCenter: parent.verticalCenter
+              }
+
+              Text {
+                textFormat: Text.PlainText
+                text: (modelData.name || "Unknown device") + (modelData.type ? "  ·  " + modelData.type : "")
+                color: root.bar.foreground
+                font.family: root.bar.fontFamily
+                font.pixelSize: Style.font.bodySmall
+                font.bold: deviceRow.isActive
+                elide: Text.ElideRight
+                width: parent.width - Style.space(26)
+                anchors.verticalCenter: parent.verticalCenter
+              }
+            }
+
+            MouseArea {
+              anchors.fill: parent
+              hoverEnabled: true
+              cursorShape: deviceRow.isActive ? Qt.ArrowCursor : Qt.PointingHandCursor
+              onClicked: {
+                if (!deviceRow.isActive && modelData.id) root.control("device", modelData.id)
+              }
+            }
+          }
         }
       }
 

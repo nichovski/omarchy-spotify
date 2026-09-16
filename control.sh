@@ -48,6 +48,16 @@ case "$ACTION" in
   next|previous)
     api POST "$ACTION"
     ;;
+  device)
+    DEVICE_ID="${2:-}"
+    [[ -z "$DEVICE_ID" ]] && exit 1
+    # Transfer playback to the chosen device and start playing there
+    curl -s -X PUT \
+      -H "Authorization: Bearer $ACCESS_TOKEN" \
+      -H "Content-Type: application/json" \
+      -d "{\"device_ids\":[\"$DEVICE_ID\"],\"play\":true}" \
+      "https://api.spotify.com/v1/me/player" >/dev/null 2>&1 || true
+    ;;
   *)
     exit 1
     ;;
