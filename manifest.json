@@ -3,7 +3,7 @@
   "id": "spotify",
   "name": "Spotify Mini Player",
   "version": "1.0.0",
-  "author": "<your-name>",
+  "author": "nichovski",
   "description": "Now-playing bar widget with playback controls for any Spotify Connect device, via the Spotify Web API",
   "kinds": [
     "bar-widget"

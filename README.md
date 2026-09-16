@@ -32,7 +32,7 @@ locally.
 ## Install
 
 ```bash
-omarchy plugin add https://github.com/<your-username>/omarchy-spotify.git --enable
+omarchy plugin add https://github.com/nichovski/omarchy-spotify.git --enable
 ```
 
 ## Connect your Spotify account
