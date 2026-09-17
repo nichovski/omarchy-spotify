@@ -29,6 +29,16 @@ BarWidget {
   property string errorMessage: ""
   property string deviceName: ""
   property var devices: []
+  property real retryAt: 0
+
+  // Normal poll cadence, stretched when Spotify has told us to back off.
+  // retryAt is an epoch-second timestamp written by fetch.sh.
+  readonly property real pollInterval: {
+    var now = Date.now() / 1000
+    if (root.retryAt > now)
+      return Math.max(1000, Math.min((root.retryAt - now) * 1000, 300000))
+    return root.isPlaying ? 15000 : 60000
+  }
 
   readonly property string activeDeviceName: {
     if (root.deviceName !== "") return root.deviceName
@@ -76,6 +86,7 @@ BarWidget {
       root.errorMessage = data.error || ""
       root.deviceName = data.device || ""
       root.devices = data.devices || []
+      root.retryAt = Number(data.retry_at || 0)
     } catch (e) {
       // Ignore parse errors
     }
@@ -99,7 +110,7 @@ BarWidget {
 
   Timer {
     id: pollTimer
-    interval: root.isPlaying ? 5000 : 15000
+    interval: root.pollInterval
     repeat: true
     running: root.hasCredentials
     triggeredOnStart: true

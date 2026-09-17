@@ -66,12 +66,27 @@ in the bar.
 ## How it works
 
 - `setup.py` — OAuth2 (PKCE) flow; stores a refresh token
-- `fetch.sh` — refreshes the access token, polls
-  `/v1/me/player/currently-playing` and writes
+- `fetch.sh` — polls `/v1/me/player/currently-playing` and writes
   `~/.config/omarchy/spotify/now_playing.json`
 - `control.sh` — sends play/pause/next/previous to `/v1/me/player/*`
-- `BarWidget.qml` — the bar widget; polls every 5 s while playing,
-  15 s while idle
+- `BarWidget.qml` — the bar widget; polls every 15 s while playing,
+  60 s while idle
+
+### Rate limits
+
+Spotify's Web API rate-limits development-mode apps aggressively. This
+plugin is deliberately frugal to stay well under the limit:
+
+- The access token is cached (`~/.config/omarchy/spotify/token.json`) and
+  reused until it is about to expire, instead of refreshing on every poll.
+- The device list is cached and refreshed at most once a minute.
+- On a `429` response the plugin honours the `Retry-After` header: it
+  records a `retry_at` timestamp and makes **no API calls at all** until it
+  elapses. The widget shows a "Spotify rate limit" notice meanwhile.
+- Other errors apply a short 60 s back-off so the plugin never hot-loops.
+
+If you do somehow hit a rate limit, playback is unaffected — the widget
+simply waits out the cooldown and resumes on its own.
 
 ## Uninstall
 
