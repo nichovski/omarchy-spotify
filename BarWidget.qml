@@ -113,7 +113,10 @@ BarWidget {
     interval: root.pollInterval
     repeat: true
     running: root.hasCredentials
-    triggeredOnStart: true
+    // NOTE: intentionally NOT triggeredOnStart. The initial fetch is done by
+    // fetchTimer when credentials load. `restart()` after each fetch must only
+    // re-arm the interval — with triggeredOnStart it fired immediately and
+    // created a fetch loop that hammered the Spotify API into a rate-limit ban.
     onTriggered: fetchProcess.running = true
   }
 
