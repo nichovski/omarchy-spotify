@@ -29,7 +29,7 @@ locally.
 ## Requirements
 
 - Omarchy (with the Quickshell-based `omarchy-shell`)
-- `curl`, `jq`, `python3` (all preinstalled on Omarchy)
+- `jq` and `python3` (both preinstalled on Omarchy)
 - A free [Spotify Developer](https://developer.spotify.com/dashboard) app
   (one-time, ~2 minutes)
 
@@ -66,6 +66,10 @@ in the bar.
 ## How it works
 
 - `setup.py` — OAuth2 (PKCE) flow; stores a refresh token
+- `spotify_api.py` — the HTTP client used by the shell scripts. It reads the
+  credentials itself (so no secret is ever passed on a command line), bounds
+  every request with a connect timeout and an overall deadline, and streams
+  each response under a hard byte cap, failing closed if the cap is exceeded.
 - `fetch.sh` — polls `/v1/me/player/currently-playing` and writes
   `~/.config/omarchy/spotify/now_playing.json`
 - `control.sh` — sends play/pause/next/previous to `/v1/me/player/*`

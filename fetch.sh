@@ -7,12 +7,18 @@
 #   - device list is cached and refreshed at most every DEVICES_TTL seconds
 #   - "Retry-After" from a 429 is honoured: no API call is made until it elapses
 #   - other errors apply a short back-off so we never hot-loop
+#
+# All HTTP is done by spotify_api.py: it reads the credentials itself, keeps
+# secrets off the process command line, bounds every request with connect and
+# total deadlines, and enforces a hard response-size cap.
 
 set -euo pipefail
 
 CRED_FILE="$HOME/.config/omarchy/spotify/credentials.env"
 OUTPUT_FILE="$HOME/.config/omarchy/spotify/now_playing.json"
-TOKEN_FILE="$HOME/.config/omarchy/spotify/token.json"
+
+DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+API_PY="$DIR/spotify_api.py"
 
 DEVICES_TTL=60        # seconds between device-list refreshes
 ERROR_BACKOFF=60      # seconds to wait after a non-429 error
@@ -49,15 +55,13 @@ write_rate_limited() { # <retry-after-seconds>
   exit 0
 }
 
-# Load credentials
+# Call spotify_api.py and always return a JSON envelope, even if it crashes.
+api_call() { # <args...>
+  python3 "$API_PY" "$@" 2>/dev/null || printf '{"status":0,"error":"spotify_api.py failed"}'
+}
+
 if [[ ! -f "$CRED_FILE" ]]; then
   write_error "No credentials found. Run: python3 ~/.config/omarchy/plugins/nichovski.spotify/setup.py" 3600
-fi
-
-source "$CRED_FILE"
-
-if [[ -z "${SPOTIFY_CLIENT_ID:-}" || -z "${SPOTIFY_CLIENT_SECRET:-}" || -z "${SPOTIFY_REFRESH_TOKEN:-}" ]]; then
-  write_error "Incomplete credentials. Run: python3 ~/.config/omarchy/plugins/nichovski.spotify/setup.py" 3600
 fi
 
 NOW=$(now)
@@ -70,32 +74,21 @@ if [[ -f "$OUTPUT_FILE" ]]; then
   fi
 fi
 
-# --- Access token (cached until shortly before expiry) ---
-ACCESS_TOKEN=""
-if [[ -f "$TOKEN_FILE" ]]; then
-  TOK_EXP=$(jq -r '.expires_at // 0' "$TOKEN_FILE" 2>/dev/null || echo 0)
-  if [[ "$TOK_EXP" =~ ^[0-9]+$ ]] && (( TOK_EXP > NOW + 30 )); then
-    ACCESS_TOKEN=$(jq -r '.access_token // empty' "$TOKEN_FILE" 2>/dev/null || echo "")
-  fi
+# --- Currently playing ---
+CUR=$(api_call now-playing)
+CUR_STATUS=$(jq -r '.status // 0' <<<"$CUR" 2>/dev/null || echo 0)
+CUR_ERROR=$(jq -r '.error // empty' <<<"$CUR" 2>/dev/null || true)
+CUR_RETRY=$(jq -r '.retry_after // 0' <<<"$CUR" 2>/dev/null || echo 0)
+BODY=$(jq -c '.body // null' <<<"$CUR" 2>/dev/null || echo null)
+
+if [[ "$CUR_STATUS" == "429" ]]; then
+  [[ "$CUR_RETRY" =~ ^[0-9]+$ ]] || CUR_RETRY=$DEFAULT_RETRY
+  (( CUR_RETRY > 0 )) || CUR_RETRY=$DEFAULT_RETRY
+  write_rate_limited "$CUR_RETRY"
 fi
 
-if [[ -z "$ACCESS_TOKEN" ]]; then
-  TOKEN_RESPONSE=$(curl -s -X POST "https://accounts.spotify.com/api/token" \
-    -d "grant_type=refresh_token" \
-    -d "refresh_token=$SPOTIFY_REFRESH_TOKEN" \
-    -H "Authorization: Basic $(echo -n "$SPOTIFY_CLIENT_ID:$SPOTIFY_CLIENT_SECRET" | base64 -w 0)" \
-    -H "Content-Type: application/x-www-form-urlencoded" 2>/dev/null || echo '{}')
-
-  ACCESS_TOKEN=$(echo "$TOKEN_RESPONSE" | jq -r '.access_token // empty' 2>/dev/null || echo "")
-  EXPIRES_IN=$(echo "$TOKEN_RESPONSE" | jq -r '.expires_in // 3600' 2>/dev/null || echo 3600)
-
-  if [[ -z "$ACCESS_TOKEN" ]]; then
-    write_error "Failed to refresh token. Credentials may be expired. Run: python3 ~/.config/omarchy/plugins/nichovski.spotify/setup.py" 300
-  fi
-
-  jq -n --arg t "$ACCESS_TOKEN" --argjson e "$(( NOW + EXPIRES_IN ))" \
-    '{access_token: $t, expires_at: $e}' > "$TOKEN_FILE"
-  chmod 600 "$TOKEN_FILE"
+if [[ "$CUR_STATUS" == "0" || -n "$CUR_ERROR" ]]; then
+  write_error "${CUR_ERROR:-Spotify API request failed}"
 fi
 
 # --- Device list (cached for DEVICES_TTL seconds) ---
@@ -109,38 +102,24 @@ if [[ -f "$OUTPUT_FILE" ]]; then
   fi
 fi
 
-# --- Currently playing (capture headers so we can read Retry-After) ---
-HDRS=$(mktemp)
-trap 'rm -f "$HDRS"' EXIT
-
-RESPONSE=$(curl -s -D "$HDRS" -w "\n%{http_code}" \
-  -H "Authorization: Bearer $ACCESS_TOKEN" \
-  "https://api.spotify.com/v1/me/player/currently-playing" 2>/dev/null || printf '\n000')
-
-HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
-BODY=$(echo "$RESPONSE" | sed '$d')
-
-if [[ "$HTTP_CODE" == "429" ]]; then
-  RETRY_AFTER=$(awk 'BEGIN{IGNORECASE=1} /^retry-after:/ {gsub(/\r/,"",$2); print $2}' "$HDRS" | tail -n1)
-  [[ "$RETRY_AFTER" =~ ^[0-9]+$ ]] || RETRY_AFTER=$DEFAULT_RETRY
-  write_rate_limited "$RETRY_AFTER"
-fi
-
 # --- Refresh devices only when the cache is stale ---
 if (( DEVICES_FETCHED_AT == 0 )); then
-  DEVICES_JSON=$(curl -s \
-    -H "Authorization: Bearer $ACCESS_TOKEN" \
-    "https://api.spotify.com/v1/me/player/devices" 2>/dev/null || echo '{}')
-  if echo "$DEVICES_JSON" | jq -e . >/dev/null 2>&1; then
-    DEVICES_LIST=$(echo "$DEVICES_JSON" | jq -c '[.devices // [] | .[] | {id, name, type, is_active}]' 2>/dev/null || echo '[]')
-  else
-    DEVICES_LIST='[]'
+  DEV=$(api_call devices)
+  DEV_STATUS=$(jq -r '.status // 0' <<<"$DEV" 2>/dev/null || echo 0)
+  DEV_RETRY=$(jq -r '.retry_after // 0' <<<"$DEV" 2>/dev/null || echo 0)
+  if [[ "$DEV_STATUS" == "429" ]]; then
+    [[ "$DEV_RETRY" =~ ^[0-9]+$ ]] || DEV_RETRY=$DEFAULT_RETRY
+    (( DEV_RETRY > 0 )) || DEV_RETRY=$DEFAULT_RETRY
+    write_rate_limited "$DEV_RETRY"
   fi
-  DEVICES_FETCHED_AT=$NOW
+  if [[ "$DEV_STATUS" == "200" ]]; then
+    DEVICES_LIST=$(jq -c '[.body.devices // [] | .[] | {id, name, type, is_active}]' <<<"$DEV" 2>/dev/null || echo '[]')
+    DEVICES_FETCHED_AT=$NOW
+  fi
 fi
 
 # --- Nothing currently playing ---
-if [[ "$HTTP_CODE" == "204" || -z "$BODY" || "$BODY" == "null" ]]; then
+if [[ "$CUR_STATUS" == "204" || "$BODY" == "null" ]]; then
   write_state "$(jq -n --argjson devices "$DEVICES_LIST" --argjson fetched "$DEVICES_FETCHED_AT" '{
     is_playing: false,
     devices: $devices,
@@ -149,12 +128,12 @@ if [[ "$HTTP_CODE" == "204" || -z "$BODY" || "$BODY" == "null" ]]; then
   exit 0
 fi
 
-if [[ "$HTTP_CODE" != "200" ]]; then
-  write_error "Spotify API error (HTTP $HTTP_CODE)"
+if [[ "$CUR_STATUS" != "200" ]]; then
+  write_error "Spotify API error (HTTP $CUR_STATUS)"
 fi
 
 # --- Playing: build output in one pass ---
-write_state "$(echo "$BODY" | jq --argjson devices "$DEVICES_LIST" --argjson fetched "$DEVICES_FETCHED_AT" '{
+write_state "$(jq --argjson devices "$DEVICES_LIST" --argjson fetched "$DEVICES_FETCHED_AT" '{
   is_playing: (.is_playing // false),
   title: (.item.name // ""),
   artist: ([.item.artists[]?.name] | join(", ")),
@@ -167,4 +146,4 @@ write_state "$(echo "$BODY" | jq --argjson devices "$DEVICES_LIST" --argjson fet
   devices: $devices,
   devices_fetched_at: $fetched,
   timestamp: (now | floor)
-}')"
+}' <<<"$BODY")"
