@@ -94,12 +94,50 @@ def load_cached_token():
     return token
 
 
+def write_private_atomic(path, data):
+    """Write text to `path` through a private exclusive temp file, then rename.
+
+    The temp file is created with O_CREAT|O_EXCL|O_NOFOLLOW at mode 0600, so it
+    cannot follow a symlink and is never briefly group- or world-readable. The
+    final os.replace is atomic and replaces a symlink at `path` instead of
+    writing through it.
+    """
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    flags = os.O_WRONLY | os.O_CREAT | os.O_EXCL | getattr(os, "O_NOFOLLOW", 0)
+
+    tmp = None
+    fd = None
+    for _ in range(100):
+        candidate = path.parent / (
+            "%s.%d.%s.tmp" % (path.name, os.getpid(), os.urandom(6).hex()))
+        try:
+            fd = os.open(candidate, flags, 0o600)
+        except FileExistsError:
+            continue
+        tmp = candidate
+        break
+    if tmp is None:
+        raise ApiError("could not create a private temporary file for %s" % path)
+
+    try:
+        with os.fdopen(fd, "w") as handle:
+            handle.write(data)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(tmp, path)
+    except BaseException:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
+
+
 def save_cached_token(token, expires_at):
-    CONFIG_DIR.mkdir(parents=True, exist_ok=True)
-    tmp = TOKEN_FILE.with_name(TOKEN_FILE.name + ".tmp")
-    tmp.write_text(json.dumps({"access_token": token, "expires_at": expires_at}))
-    os.chmod(tmp, 0o600)
-    tmp.replace(TOKEN_FILE)
+    write_private_atomic(
+        TOKEN_FILE,
+        json.dumps({"access_token": token, "expires_at": expires_at}))
 
 
 def http_request(method, host, path, headers=None, body=None):
