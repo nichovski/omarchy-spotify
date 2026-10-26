@@ -148,8 +148,9 @@ def http_request(method, host, path, headers=None, body=None):
         conn.putrequest(method, path)
         for key, value in (headers or {}).items():
             conn.putheader(key, value)
-        if body is not None:
-            conn.putheader("Content-Length", str(len(body)))
+        # Always send Content-Length. Spotify rejects a PUT/POST that carries no
+        # body and no Content-Length (pause, next, previous) with HTTP 411.
+        conn.putheader("Content-Length", str(len(body) if body is not None else 0))
         conn.endheaders(body)
 
         resp = conn.getresponse()
